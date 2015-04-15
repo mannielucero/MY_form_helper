@@ -1,0 +1,839 @@
+<?php
+set_time_limit(0);
+require_once(dirname(dirname(__FILE__)).'/databASe/Db.php');
+/**********************************************
+				CREATED BY MANNIE
+***********************************************/
+clASs call_status
+{
+	public $date;
+	public $status;
+
+	function __construct() 
+	{
+		$this->date_FROM = '';
+		$this->date_to = '';
+		$this->db_cmax_r = 'cmax_reports';
+		$this->db_cmax = 'collectionsmax';
+		$this->tbl_clv = 'call_logs_vocalocity';
+		$this->tbl_dbASe = 'dbASe';
+		$this->tbl_payments = 'payments';
+		$this->tbl_settings = 'collector_setting';
+	}
+	
+	// SETTERS
+	function setDate( $date )
+	{
+		$this->date = $date;
+	}
+
+	function setStatus( $status )
+	{
+		$this->status = $status;
+	}
+
+	/************************************/
+	
+	// GETTERS		
+function getDate()
+	{
+		return $date->date;
+	}
+
+	function getStatus()
+	{
+		return $status->status;
+	}
+
+	/************************************/	
+
+	function getStatusname()
+	{
+		$db = Db::getInstance(); 
+
+		$sql = "SELECT DISTINCT `statusname`
+				FROM `{$this->db_cmax}`.`{$this->tbl_dbASe}` 
+				ORDER BY `statusname`";				
+ 				
+		return $db->ExecuteS($sql);
+	}	
+
+
+
+
+	function findPosition( $arr,$var,$arr_key ) {
+		    
+	    foreach($arr AS $key => $value) {
+
+	        if($value[$arr_key] == $var) return $key;
+	    }
+
+	    return false;
+	}
+
+	function searchArray( $arr,$var,$arr_key ) {
+		    
+	    foreach($arr AS $key => $value) {
+
+	        if($value[$arr_key] == $var) return true;
+	    }
+
+	    return false;
+	}
+
+	
+
+	function getNotCalled()
+	{
+		$db = Db::getInstance(); 
+
+		$sql = "SELECT db.`filenumber`,db.`fullname`,db.`currentbalance` 					FROM `$this->db_cmax_r`.`$this->tbl_clv`  AS clv
+			INNER JOIN `$this->db_cmax`.`$this->tbl_dbASe`  AS db
+			ON clv.`filenumber` = db.`filenumber`
+WHERE STR_TO_DATE(clv.`call_datetime`, '%Y-%m-%d') !=   STR_TO_DATE('{$this->date}', '%Y-%m-%d') 
+			AND clv.`call_direction` = 'outbound' 
+			AND db.`statusname` = '{$this->status}'
+			ORDER BY db.`currentbalance` ";
+ 
+		return $db->ExecuteS($sql);
+	}
+
+	function getCalled()
+	{
+		$db = Db::getInstance(); 
+
+$sql = "SELECT db.`filenumber`,db.`fullname`,clv.`call_FROM`,
+clv.`call_to`,DATE_FORMAT(clv.`call_datetime`,'%H:%i:%s') AS call_datetime,clv.`call_length`,TIME_TO_SEC(clv.`call_length`) AS sec,clv.`call_result` FROM `$this->db_cmax_r`.`$this->tbl_clv`  AS clv
+			INNER JOIN `$this->db_cmax`.`$this->tbl_dbASe`  AS db
+			ON clv.`filenumber` = db.`filenumber`
+WHERE STR_TO_DATE(clv.`call_datetime`, '%Y-%m-%d') 
+= STR_TO_DATE('{$this->date}', '%Y-%m-%d') 
+			AND clv.`call_direction` = 'outbound' 
+			AND db.`statusname` = '{$this->status}'
+			ORDER BY clv.`call_length` ";
+ 
+		return $db->ExecuteS($sql);
+	}
+
+
+
+
+
+	function getLAStPostedPayment( $filenumber )
+	{
+		$db = Db::getInstance(); 
+
+		$sql = "SELECT `paymentdate` 
+				FROM `$this->db_cmax`.`$this->tbl_payments` 
+				WHERE `filenumber` = '{$filenumber}'
+				AND `paymentstatus` = 'POSTED'
+				ORDER BY `paymentdate` DESC";
+
+		return $db->getValue($sql);
+
+	}
+}
+
+¬
+<?php 
+	/**********************************************
+					CREATED BY MANNIE
+	***********************************************/
+
+	require_once(dirname(__FILE__).'/header_call_status.php');
+	require_once(dirname(__FILE__).'/clASs/call_status.php');
+
+	if (isset ( $_POST ['run_report'] )) {
+		
+		$FROM = $_POST['FROM'];
+		$status = $_POST['status'];
+
+	}
+
+	$obj = new call_status;
+	$status_arr = $obj->getStatusname();	
+
+
+	if( isset($_POST['status']) && isset($_POST['FROM']) ){
+		
+		$key = $obj->findPosition($status_arr, $status, 'statusname' );
+
+		unset($status_arr[$key]);
+
+		$obj->setDate( $FROM );
+		$obj->setStatus( $status );
+
+		$not_called_arr = $obj->getNotCalled();
+		$called_arr = $obj->getCalled();
+
+		$not_called = array_unique($not_called_arr);
+		$called = array_unique($called_arr);
+
+	}
+	
+
+?>
+ 
+<h5><strong>Call Status Report</strong></h5>
+<span id="display-date" style="margin: -26px 0 0 0;">
+<?php  echo date("n/j/Y") ?>
+</span>
+<hr>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="bootstrap/css/bootstrap.css" type="text/css">
+
+<div clASs="container">
+	<div clASs="row">
+		<div clASs="col-md-12">
+<form method="post" enctype="application/x-www-form-urlencoded" clASs="form-inline" role="form" onsubmit="return checkDates();">
+				<div clASs="form-group">
+  		  			<label for="status">Select Status</label>
+					<select name="status"  clASs="form-control">		
+<option value="<?php echo $status; ?>"><?php echo $status; ?></option>
+						<?php
+foreach ($status_arr AS $key => $value) {
+						?>
+<option value="<?php echo $value['statusname']; ?>"><?php echo $value['statusname']; ?></option>
+						<?php
+							}
+						?>
+					</select>
+				</div>
+				<div clASs="form-group">
+    				<label for="to">Select Date</label>
+<input name="FROM"  type="text" id="FROM" clASs="form-control input-lg" style="height: 35px;width: 126px;" value="<?php echo $FROM;?>" />
+				</div>				
+<input name="run_report" type="submit" id="run" value="Run Report" clASs="btn btn-primary" style="margin-left:5px;" />		
+<a href="index.php" clASs="pull-right"><img src="images/home_icon.jpg" title="Home"></a>				
+			</form>
+
+		</div> <!-- col-md-12 -->
+	</div><!-- row -->
+</div><!-- container -->
+
+<div clASs="container">
+	<div clASs="row">
+		<div clASs="col-md-8">
+
+			<!-- CALLED -->	
+
+			<div clASs="table-default">
+
+				<h4>CALLED</h4>
+				<div clASs="display-table">
+				<table>
+					<tr>
+						<th>File #</th>
+						<th>Debtor Name</th>
+						<th>EXT</th>
+						<th># Called</th>
+						<th>Time of Call</th>
+						<th>Length of Call</th>
+						<th>Result</th>						
+						<th>Connected</th>						
+					</tr>
+					<tr>
+			<?php
+				foreach ($called AS $key => $value) {
+
+					$filenumber = $value['filenumber'];
+					$fullname = $value['fullname'];
+					$call_FROM = $value['call_FROM'];
+					$call_to = $value['call_to'];
+					$time = $value['call_datetime'];
+					$length = $value['call_length'];
+					$result = $value['call_result'];
+					$sec = $value['sec'];
+			?>
+
+
+					<?php
+						echo '<td>'.$filenumber.'</td>';
+						echo '<td>'.$fullname.'</td>';
+						echo '<td>'.$call_FROM.'</td>';
+						echo '<td>'.$call_to.'</td>';
+						echo '<td>'.$time.'</td>';
+						echo '<td>'.$length.'</td>';
+						echo '<td>'.$result.'</td>';
+						if ( $sec >= 30 ) {
+							echo '<td>X</td>';
+						} else {
+							echo '<td></td>';
+						}
+						
+					?>	
+					</tr>
+				
+			<?php
+				} // END OF FOREACH
+			?>
+				</table>
+				</div>
+			</div>
+
+		</div> <!-- col-md-8 -->
+		<div clASs="col-md-4">
+
+			<!-- NOT CALLED -->
+
+			<div clASs="table-default">
+				<h4>NOT CALLED</h4>
+				<div clASs="display-table">
+				<table>	
+					<tr>
+						<th>File #</th>
+						<th>Debtor Name</th>
+						<th>Balance</th>
+						<th>LASt Posted Payment</th>						
+					</tr>
+					<tr>
+			<?php
+				foreach ($not_called AS $key => $value) {
+
+					$filenumber = $value['filenumber'];
+					$fullname = $value['fullname'];
+					$currentbalance = $value['currentbalance'];
+
+$check_filenumber = $obj->searchArray($called, $filenumber, 'filenumber');
+					
+					if ( empty($check_filenumber) ) {
+			
+$posted_payment = $obj-> getLAStPostedPayment($filenumber);					
+						echo '<td>'.$filenumber.'</td>';
+						echo '<td>'.$fullname.'</td>';
+						echo '<td>'.$currentbalance.'</td>';
+						if ( empty($posted_payment) ) {
+							echo '<td>NONE</td>';			
+						} else {
+							echo '<td>'.$posted_payment.'</td>';
+						}						
+					?>	
+					</tr>
+				
+			<?php
+					}// END OF CHECK_FILENUMBER 
+				} // END OF FOREACH
+			?>
+				</table>
+				</div>
+			</div>
+
+		</div> <!-- col-md-4 -->
+	</div><!-- row -->
+</div><!-- container -->
+
+<?php
+
+require_once('footer.php');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
+clASs Login extends CI_Controller {
+
+	
+	public function index()
+	{
+		$this->form_validation->set_rules('uname','Username', 'trim|required');
+		$this->form_validation->set_rules('pw','PASsword', 'trim|required');
+
+		if($this->form_validation->run() == FALSE)
+		{
+echo json_encode(array('error' => '1', 'message' => validation_errors('<div clASs="alert alert-error"><strong>Error!</strong> ', '</div>')));
+		}
+		else
+		{
+			$username = $this->input->post('uname');
+			$pASsword = $this->input->post('pw');
+
+$account_ID = $this->Generalmodel->check_login($username, $pASsword);
+			
+			if(! $account_ID)
+			{
+echo json_encode(array('error' => '1', 'message' => '<div clASs="alert alert-error"><strong>Wrong Username or PASsword!</strong> ', '</div>'));
+			}
+			else
+			{
+$login_data = array('logged_in'=>TRUE, 'account_ID' => $account_ID['account_ID']);
+				$this->session->set_userdata($login_data);
+echo json_encode(array('error' => '0', 'message' => '<div clASs="alert alert-success"><strong>Success!</strong> You have been registered!</div>'));
+
+				$account_ID = $this->session->userdata('account_ID');
+				$this->Generalmodel->lASt_login($account_ID);
+			}
+		}
+	
+} 
+
+}
+
+<?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
+clASs Signup extends CI_Controller {
+	public function index()
+	{
+		$this->load->helper('security'); // loading xss_clean
+$this->form_validation->set_rules('token','Token', 'trim|required|xss_clean|callback_check_token|');
+$this->form_validation->set_rules('email','Email',  'trim|required|xss_clean|valid_email|callback_email_not_exists');
+$this->form_validation->set_rules('username','Username', 'trim|required|min_length[6]|xss_clean|callback_username_not_exists');
+$this->form_validation->set_rules('pASsword','PASsword', 'trim|required|min_length[6]|xss_clean');	
+$this->form_validation->set_rules('repASsword','Re-pASsword', 'trim|required|matches[pASsword]|xss_clean');	
+			
+
+		if($this->form_validation->run() == FALSE)
+		{
+			$this->load->view('signup_view');
+		}
+		else
+		{
+			$token = $this->input->post('token');
+			$email = $this->input->post('email');
+			$username = $this->input->post('username');
+			$pASsword = $this->input->post('pASsword');
+			$user_info_ID = $this->Generalmodel->check_token($token);
+
+			if($user_info_ID)
+			{
+$result = $this->Generalmodel-> register_user_account($username, $pASsword, $email, $user_info_ID);
+			if($result)
+			{
+				$this->Generalmodel->update_token($token);
+				$success_data = array('success'=>TRUE);
+				$this->session->set_userdata($success_data);
+				$this->load->view('signup_success');		
+			}
+		}
+	}				
+}
+
+	function check_token($token){
+
+		$this->form_validation->set_message('check_token', 'Token is not valid 
+or already used');
+
+		if($this->Generalmodel->check_token($token))
+		{
+			return TRUE;
+		}
+		else{
+			return FALSE;
+		}
+
+	}
+
+	function email_not_exists($email){
+		$this->form_validation->set_message('email_not_exists',
+ 		'That %s is already exists.');
+		
+		if($this->Generalmodel->check_exists_email($email)){
+			return false;
+		}else{
+			return true;
+		}
+	}
+
+	function username_not_exists($username){
+		$this->form_validation->set_message('username_not_exists', 
+'That %s is already exists.');
+		
+		if($this->Generalmodel->check_exists_username($username)){
+			return false;
+		}else{
+			return true;
+		}
+	}
+} 
+<?php
+
+clASs Generalmodel extends CI_Model{
+
+	//CHECK IF THE USERNAME AND PASSWORD IS CORRECT//
+	function check_login($username, $pASsword){
+
+		$sha1 = sha1($pASsword);
+$query = "SELECT account_ID FROM tbl_account WHERE username = ? 
+AND pASsword = ? OR cellno = ? AND pASsword = ?";
+$result = $this->db-> query($query,array($username,$sha1,$username,$sha1));
+		
+if($result->num_rows() > 0)
+		{
+			return $result->row_array();
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	//USER REGISTRATION//
+	function register_user_account($username, $pASsword, $email, $user_info_ID){
+
+		$sha1 = sha1($pASsword);
+		$query = "INSERT INTO tbl_account (username, pASsword, email) 
+VALUES (?,?,?)";
+		$result = $this->db->query($query,array($username, $sha1, $email));
+
+		if($result)
+		{
+			$query = "SELECT MAX(account_ID) AS account_ID FROM tbl_account";
+			$result = $this->db->query($query);
+			$id = $result->row_array();
+
+			if($result->num_rows() == 1)
+			{
+$query = "INSERT INTO tbl_user (account_type_ID, account_ID, user_info_ID) VALUES (?,?,?)";
+$result = $this->db-> query($query,array(2,$id['account_ID'],$user_info_ID));
+
+				return $result;
+			}
+		}
+	}
+
+	//CHECK THE EMAIL 
+	function check_exists_email($email){
+
+		$query = "SELECT email FROM tbl_account WHERE email = ?";		
+		$result = $this->db->query($query, $email);
+		
+		if($result->num_rows()>0){
+			return true;
+		}else{
+			return false;
+		}
+	}
+
+	//CHECK THE USERNAME
+	function check_exists_username($username){
+		$query = "SELECT username FROM tbl_account WHERE username = ?";		
+		$result = $this->db->query($query, $username);
+		
+		if($result->num_rows()>0){
+			return true;
+		}else{
+			return false;
+		}
+	}
+
+	//ADD CONSTITUENTS
+	function register_user($fname, $lname, $middlename, $birthday, $gender, 
+$ad, $token){
+
+		$query = "INSERT INTO tbl_user_info (fname, lname, mname, bday,
+ 				gender, address) VALUES (?,?,?,?,?,?)";
+		$result = $this->db->query($query,array($fname, $lname, 
+$middlename, $birthday, $gender, $ad));
+
+		if($result)
+		{
+			$query = "SELECT MAX(user_info_ID) AS user_info_ID 
+FROM tbl_user_info";
+			$result = $this->db->query($query);
+			$user_id = $result->row_array();
+
+			if($result->num_rows() == 1)
+			{
+				$query = "INSERT INTO tbl_token 
+(token, user_info_ID) VALUES (?,?)";
+$result = $this->db-> 
+query($query,array($token, $user_id['user_info_ID']));
+			}
+		}
+	}
+
+	//CHECK THE USER ACCOUNT TYPE
+	function check_user($account_ID){
+
+		$query = "SELECT account_type_ID FROM tbl_user AS t1
+			INNER JOIN tbl_account AS t2
+			on t2.account_ID = t1.account_ID
+			WHERE t2.account_ID = ?";
+		$result = $this->db->query($query,array($account_ID));
+
+		if($result->num_rows()>0)
+		{
+			return $result->row(0)->account_type_ID;
+		}
+	}
+
+	//UPDATE THE TOKEN IF ITS USED
+	function update_token($token){
+
+		$query = "UPDATE tbl_token SET status = ? WHERE token = ?";
+		$result = $this->db->query($query, array(TRUE, $token));}
+	//CHECK TOKEN IF VALID
+	function check_token($token){
+
+		$query = "SELECT user_info_ID FROM tbl_token WHERE token = ? 
+AND status = ?";
+		$result = $this->db->query($query,array($token, FALSE));
+
+		if($result->num_rows()>0)
+		{
+			return $result->row(0)->user_info_ID;
+		}
+		else
+		{
+			return FALSE;
+		}
+	}
+
+	//RANDOM STRING FOR TOKEN
+	function rAND_string() {
+			
+		$chars = "0123456789";	
+		$str = '';
+		$size = strlen( $chars );
+
+		for( $i = 0; $i < 5; $i++ ) 
+		{
+			$str .= $chars[ rAND( 0, $size - 1 ) ];
+		}
+		return $str;	
+	}
+
+	function get_user_ID($account_ID){
+
+		$query = "SELECT user_ID FROM tbl_user WHERE account_ID = ?";
+		$result = $this->db->query($query,array($account_ID));
+		return $result->row(0)->user_ID;
+	}
+
+	// USER
+	function get_senditem_data($user_ID,$service_ID){
+
+		$query = "SELECT *,DATE_FORMAT(date, '%a, %b %e, %Y %h:%i %p') 
+AS dateformat
+			FROM tbl_service AS t1
+			INNER JOIN tbl_content AS t2
+			ON t2.content_ID = t1.content_ID
+			INNER JOIN tbl_service_type AS t3
+			ON t3.service_type_ID = t2.service_type_ID
+			WHERE user_ID = ? AND service_ID = ?";
+
+		$result = $this->db->query($query,array($user_ID,$service_ID));
+		return $result->result_array();
+	}
+
+	// ADMIN
+	function get_send_data($serviceid){
+
+$query = "SELECT fname,mname,lname,reply,DATE_FORMAT(t1.date, 
+'%a, %b %e, %Y %h:%i %p') AS dateformat,service_reply_ID 
+			FROM tbl_service_reply AS t1
+			INNER JOIN tbl_service AS t2
+			ON t2.service_ID = t1.service_ID
+			INNER JOIN tbl_user AS t3
+			ON t3.user_ID = t2.user_ID
+			INNER JOIN tbl_user_info AS t4
+			ON t4.user_info_ID = t3.user_info_ID
+			WHERE service_reply_ID = ?
+			ORDER BY service_reply_ID desc";
+
+		$result = $this->db->query($query,$serviceid);
+		return $result->result_array();
+
+	}
+
+	function search($search,$start_row,$per_page){
+
+$query = "SELECT fname,mname,lname,bday,gender,address,token,
+status,t1.user_info_ID FROM tbl_user_info AS t1
+			INNER JOIN tbl_token AS t2
+			ON t2.user_info_ID = t1.user_info_ID
+			WHERE lname LIKE '$search%'
+			ORDER BY status,lname
+			LIMIT $start_row,$per_page";
+
+		$result = $this->db->query($query);
+
+		return $result->result_array();
+	}
+
+	function update_account($cellno, $active_cell, $account_ID){
+
+		$query = "UPDATE tbl_account SET cellno = ?, active_cell = ?
+ WHERE account_ID = ?";
+
+		$result = $this->db->query($query,array($cellno, 
+$active_cell, $account_ID));
+
+		return $result;
+	}
+
+	function get_cellphone($account_ID){
+
+		$query = "SELECT cellno,active_cell 
+FROM tbl_account WHERE account_ID = ?";
+$result = $this->db->query($query,$account_ID);
+		return $result->result_array();
+
+	}
+
+	function update_user_info($fname, $lname,$middlename, $birthday, 
+$gender, $ad, $id){
+
+		$query = "UPDATE tbl_user_info SET fname = ?, lname = ?, mname = ?,
+ bday = ?, gender = ?, address = ? WHERE user_info_ID = ?";
+$result = $this->db->query($query, array($fname, $lname,
+$middlename, $birthday, $gender, $ad, $id));
+		return $result;
+
+	}
+
+	function last_login($account_ID){
+
+		$query = "UPDATE tbl_account set lASt_login = now() WHERE account_ID = ?";
+
+		$result = $this->db->query($query,$account_ID);}
+
+	function view_last_login($user_info_ID){
+
+		$query = "SELECT DATE_FORMAT(lASt_login, '%a, %b %e, %Y %h:%i %p')
+ 			AS date  
+			FROM tbl_account AS t1
+			INNER JOIN tbl_user AS t2
+			ON t2.account_ID = t1.account_ID
+			INNER JOIN tbl_user_info AS t3
+			ON t3.user_info_ID = t2.user_info_ID
+			WHERE t3.user_info_ID = ?";
+		$result = $this->db->query($query,$user_info_ID);
+
+		if($result->num_rows() > 0)
+		{
+			return $result->row()->date;
+		}
+	}
+
+	function add_category($category){
+
+		$query = "INSERT INTO tbl_service_type (service_type) VALUES (?)";
+		$result = $this->db->query($query, $category);
+		return $result;
+	}
+}
+
+
+<?php
+	include_once('header_view.php');
+?>	
+	<div class = "container">	
+		<div class = "row row-margin-top">
+<?= form_open(base_url('signup'));?>
+		<div class="signup well">
+		<div class="input">
+			<label>Token:
+			<?=form_input(array('name'=>'token','placeholder'=>'Token',
+'class'=>'span4','value'=>set_value('token')));?>
+			</label>
+		</div>
+		<div class="input">
+			<label>Email:
+			<?= form_input(array('name'=>'email','placeholder'=>'Email',
+'class'=>'span4','value'=>set_value('email')));?>
+			</label>
+		</div>
+		<div class="input">
+			<label>Username:
+			<?= form_input(array('name'=>'username','placeholder'=>'Username',
+'class'=>'span4','value'=>set_value('username')));?>
+			</label>
+		</div>
+		<div class="input">
+			<label>Password:
+			<?= form_password(array('name'=>'password','placeholder'=>
+'Password','class'=>'span4'));?>
+			</label>
+		</div>
+		<div class="input">
+			<label>Re-password:
+			<?= form_password(array('name'=>'repassword','placeholder'=>
+'Re-password','class'=>'span4'));?>
+			</label>
+		</div>
+		<div>
+			<?= form_submit(array('name'=>'signup','value'=>
+'Sign Up!', 'class'=>'btn btn-success'))?>
+		</div>
+		<?php
+			if(validation_errors())
+			{
+		?>
+			<div class="error">
+				<div class="t-error text-error">
+		<?php
+				if(form_error('token'))
+				{
+					echo form_error('token');
+				}
+				elseif(form_error('email'))
+				{
+					echo form_error('email');
+				}
+				elseif(form_error('username'))
+				{
+					echo form_error('username');
+				}
+				elseif(form_error('password'))
+				{
+					echo form_error('password');
+				}
+				elseif(form_error('repassword'))
+				{
+					echo form_error('repassword');
+				}
+		?>
+				</div>
+			</div>
+		<?php		
+			}
+			else
+			{
+		?>
+			<div class="signup-footer">
+				BrgyBakilid © 2013
+			</div>
+
+		<?php
+			}
+		?>	
+
+			
+		</div>
+		<?= form_close();?>
+
+		</div>
+	</div><!--container-->		
+
+<?php
+	include_once('footer_view.php');
+?>	
+
+
+
